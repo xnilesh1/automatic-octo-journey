@@ -21,7 +21,7 @@ st.title("Chat with Your PDF")
 
 
 #MainMenu {visibility: hidden;}
-st.markdown("""
+st.html("""
 footer {visibility: hidden;}
 header {visibility: hidden;}
 .stDeployButton {display: none;}
