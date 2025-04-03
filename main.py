@@ -136,5 +136,6 @@ if st.session_state.file_uri is not None and len(st.session_state.messages) > 0:
             parts=[types.Part.from_uri(file_uri=st.session_state.file_uri, mime_type="application/pdf")]
         )
         st.session_state.api_messages = [initial_system_message]
-        st.experimental_rerun()
+        st.rerun()
+        
         
