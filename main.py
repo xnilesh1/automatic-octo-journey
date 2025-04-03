@@ -18,6 +18,19 @@ if "file_uri" not in st.session_state:
 # Streamlit UI title
 st.title("Chat with Your PDF")
 
+
+
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.stDeployButton {display: none;}
+[data-testid="stToolbar"] {visibility: hidden !important;}
+[data-testid="stDecoration"] {visibility: hidden !important;}
+.viewerBadge_link__1S137 {display: none !important;}
+.viewerBadge_container__1QSob {display: none !important;}
+.stAttribution {display: none !important;}
+
+
 # File uploader for PDF
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
