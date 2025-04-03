@@ -1,0 +1,9 @@
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display: none;}
+    [data-testid="stToolbar"] {visibility: hidden !important;}
+    [data-testid="stDecoration"] {visibility: hidden !important;}
+    .viewerBadge_link__1S137 {display: none !important;}
+    .viewerBadge_container__1QSob {display: none !important;}
+    .stAttribution {display: none !important;}
