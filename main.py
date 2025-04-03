@@ -1,174 +1,112 @@
 import streamlit as st
-import os
-import tempfile
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
+import tempfile
+import os
 
-load_dotenv()
+# Set up the Gemini API client
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Page configuration
-st.set_page_config(page_title="PDF Chat with Gemini", page_icon="📄", layout="wide")
-
-# Initialize session state variables
+# Initialize session state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-if "uploaded_file" not in st.session_state:
-    st.session_state.uploaded_file = None
-
 if "file_uri" not in st.session_state:
     st.session_state.file_uri = None
 
-# App title and description
-st.title("💬 Chat with your PDF")
-st.markdown("Upload a PDF document and ask questions about its content")
+# Streamlit UI title
+st.title("Chat with Your PDF")
 
-# Sidebar for API key input
-api_key = os.getenv("GOOGLE_API_KEY")
+# File uploader for PDF
+uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
 
-# Function to process PDF and initialize Gemini client
-def process_pdf(uploaded_file):
-    if api_key:
-        try:
-            # Initialize Gemini client
-            client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
-            
-            # Create a temporary file to save the uploaded file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-                tmp_file.write(uploaded_file.getvalue())
-                tmp_file_path = tmp_file.name
-            
-            # Upload the file to Gemini
-            file = client.files.upload(file=tmp_file_path)
-            
-            # Clean up the temporary file
-            os.unlink(tmp_file_path)
-            
-            return client, file
-        
-        except Exception as e:
-            st.error(f"Error processing PDF: {str(e)}")
-            return None, None
-    else:
-        st.error("Please enter your Gemini API Key in the sidebar.")
-        return None, None
+# Handle PDF upload
+if uploaded_file is not None and st.session_state.file_uri is None:
+    # Save the uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_path = tmp_file.name
+    
+    # Upload to Gemini API and get file URI
+    file = client.files.upload(file=tmp_path)
+    st.session_state.file_uri = file.uri
+    
+    # Clean up temporary file
+    os.remove(tmp_path)
+    st.success("PDF uploaded successfully!")
 
-# Function to generate response from Gemini
-def get_completion(messages, file_uri):
-    if not api_key:
-        st.error("Please enter your Gemini API Key in the sidebar.")
-        return
-    
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
-    model = "gemini-2.5-pro-exp-03-25"  # Using the same model as in your example
-    
-    # Construct the initial prompt with the PDF file
-    contents = [
-        types.Content(
-            role="user",
-            parts=[
-                types.Part.from_uri(
-                    file_uri=file_uri,
-                    mime_type="application/pdf",
-                ),
-                types.Part.from_text(text=messages[-1]["content"]),
-            ],
-        ),
-    ]
-    
-    # Configure generation parameters
-    generate_content_config = types.GenerateContentConfig(
-        temperature=0.3,
-        response_mime_type="text/plain",
-    )
-    
-    thinking_complete = False
-    response = ""
-    thinking = ""
-    final_answer = ""
-    
-    # Stream the response and separate thinking from final answer
-    for chunk in client.models.generate_content_stream(
-        model=model,
-        contents=contents,
-        config=generate_content_config,
-    ):
-        text_chunk = chunk.text if hasattr(chunk, 'text') else ""
-        
-        # Check if we've moved from thinking to final answer
-        if not thinking_complete and "Okay, here" in text_chunk or "Here's the" in text_chunk:
-            thinking_complete = True
-        
-        # Add text to appropriate section
-        if not thinking_complete:
-            thinking += text_chunk
-        else:
-            final_answer += text_chunk
-        
-        # Yield the combined text (this will be used for display in the UI)
-        response = thinking + final_answer
-        yield response
+# Chat interface (only enabled if a PDF is uploaded)
+if st.session_state.file_uri is not None:
+    # Display chat history
+    for message in st.session_state.messages:
+        role = message.role
+        with st.chat_message(role if role == "user" else "assistant"):
+            parts = message.parts
+            text_parts = [part.text for part in parts if hasattr(part, 'text')]
+            file_parts = [part.file_uri for part in parts if hasattr(part, 'file_uri')]
+            if file_parts and role == "user":
+                st.markdown(f"[Document uploaded] {' '.join(text_parts)}")
+            else:
+                st.markdown(' '.join(text_parts))
 
-# Main layout - PDF upload area
-uploaded_file = st.file_uploader("Upload a PDF document", type="pdf", key="pdf_uploader")
+    # Chat input
+    user_input = st.chat_input("Ask me anything about the document...")
 
-# Process the PDF when uploaded
-if uploaded_file and (st.session_state.uploaded_file != uploaded_file.name):
-    st.session_state.uploaded_file = uploaded_file.name
-    
-    with st.status("Processing PDF...", expanded=True) as status:
-        st.write("Uploading file to Gemini API...")
-        client, file = process_pdf(uploaded_file)
-        
-        if file:
-            st.session_state.file_uri = file.uri
-            status.update(label="PDF processed successfully!", state="complete", expanded=False)
-            
-            # Clear previous messages when a new PDF is uploaded
-            st.session_state.messages = []
-            
-            # Add system message
-            st.session_state.messages.append({
-                "role": "assistant", 
-                "content": f"I've processed your PDF '{uploaded_file.name}'. Ask me any questions about it!"
-            })
-            st.rerun()
-
-# Display chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Chat input
-if st.session_state.file_uri:
-    user_input = st.chat_input("Ask a question about your PDF...")
-    
     if user_input:
-        # Add user message
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        # Handle user input
+        if not st.session_state.messages:
+            # First query: include the PDF URI and user input
+            st.session_state.messages.append(
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_uri(file_uri=st.session_state.file_uri, mime_type="application/pdf"),
+                        types.Part.from_text(text=user_input),
+                    ]
+                )
+            )
+        else:
+            # Subsequent queries: text only
+            st.session_state.messages.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=user_input)]
+                )
+            )
+
+        # Display user message immediately
         with st.chat_message("user"):
-            st.markdown(user_input)
-        
-        # Stream assistant response with thinking process displayed
+            if len(st.session_state.messages) == 1:
+                st.markdown(f"[Document uploaded] {user_input}")
+            else:
+                st.markdown(user_input)
+
+        # Generate and stream assistant response
         with st.chat_message("assistant"):
-            with st.status("Thinking...", expanded=True) as status:
-                response_generator = get_completion(st.session_state.messages, st.session_state.file_uri)
+            with st.status("Assistant is thinking...", expanded=True) as status:
+                contents = st.session_state.messages
+                generate_content_config = types.GenerateContentConfig(
+                    temperature=0.3,
+                    response_mime_type="text/plain",
+                )
+                response_generator = client.models.generate_content_stream(
+                    model="gemini-2.5-pro-exp-03-25",  # Replace with the correct model name if needed
+                    contents=contents,
+                    config=generate_content_config,
+                )
                 full_response = ""
-                
-                # Stream the thinking and response
-                for response_chunk in response_generator:
-                    full_response = response_chunk
-                    status.update(label="Gemini's thinking process:", state="running")
-                    status.write(full_response)
-                
-                # When complete, update status
-                status.update(label="Thought process complete", state="complete", expanded=False)
-                
-                # Display final answer
-                st.markdown(full_response)
-        
-        # Add assistant response to message history
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+                response_container = st.empty()
+                for chunk in response_generator:
+                    full_response += chunk.text
+                    response_container.write(full_response)
+                status.update(label="Response generated!", state="complete")
+
+            # Append assistant response to history
+            st.session_state.messages.append(
+                types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text=full_response)]
+                )
+            )
 else:
-    st.info("Please upload a PDF document to start chatting.")
+    st.info("Please upload a PDF to start chatting.")
+
