@@ -21,6 +21,7 @@ st.title("Chat with Your PDF")
 
 
 #MainMenu {visibility: hidden;}
+st.markdown("""
 footer {visibility: hidden;}
 header {visibility: hidden;}
 .stDeployButton {display: none;}
@@ -29,7 +30,7 @@ header {visibility: hidden;}
 .viewerBadge_link__1S137 {display: none !important;}
 .viewerBadge_container__1QSob {display: none !important;}
 .stAttribution {display: none !important;}
-
+""")
 
 # File uploader for PDF
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
