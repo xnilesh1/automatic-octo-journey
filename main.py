@@ -20,17 +20,11 @@ st.title("Chat with Your PDF")
 
 
 
-#MainMenu {visibility: hidden;}
-st.html("""
-footer {visibility: hidden;}
-header {visibility: hidden;}
-.stDeployButton {display: none;}
-[data-testid="stToolbar"] {visibility: hidden !important;}
-[data-testid="stDecoration"] {visibility: hidden !important;}
-.viewerBadge_link__1S137 {display: none !important;}
-.viewerBadge_container__1QSob {display: none !important;}
-.stAttribution {display: none !important;}
-""")
+def load_custom_css(file_path):
+    with open(file_path) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+load_custom_css("custom.css")
 
 # File uploader for PDF
 uploaded_file = st.file_uploader("Upload a PDF", type="pdf")
